@@ -5,6 +5,7 @@ import (
   "fmt"
   "strings"
   "encoding/json"
+  "regexp"
   "reflect"
 )
 
@@ -331,6 +332,7 @@ func validatePatterMatch(pat map[string]string, exact bool, matchedKeys []string
   }
   sort.Strings(keys)
 
+
   if len(keys) == 0 {
     return true
   }
@@ -346,12 +348,26 @@ func validatePatterMatch(pat map[string]string, exact bool, matchedKeys []string
     foundKeys = append(foundKeys, val)
   }
 
+
   var matched = true
   for i := 0; i < len(foundKeys); i++ {
-    if foundKeys[i] != matchedKeys[i] && foundKeys[i] != "*"{
+    //regex here
+
+
+    if i >= len(matchedKeys) {
+      matched = false
+    }
+    if matched && i % 2 == 0 && foundKeys[i] != matchedKeys[i] {
+      matched = false
+    }
+    if matched && i % 2 != 0 && !gexval(foundKeys[i], matchedKeys[i]) {
+    //if foundKeys[i] != matchedKeys[i] && founKeys[i] != "*"{
       matched = false
     }
 
+    if !matched {
+      break
+    }
   }
 
   if exact && len(foundKeys) != len(matchedKeys) {
@@ -407,4 +423,40 @@ func createMap(pat string) map[string]string {
     }
 
     return mapData
+}
+
+func gexval(pattern string, value string) bool {
+
+  pattern = escregexp(pattern)
+
+  // use [\s\S] instead of . to match newlines
+
+  r := regexp.MustCompile(`\\\*`)
+
+  pattern = r.ReplaceAllString(pattern, "[\\s\\S]*")
+
+  r = regexp.MustCompile(`\\\?`)
+  pattern = r.ReplaceAllString(pattern, "[\\s\\S]")
+
+  // escapes ** and *?
+  r = regexp.MustCompile(`\[\\s\\S\]\*\[\\s\\S\]\*`)
+  pattern = r.ReplaceAllString(pattern, `\\\*`)
+
+  r = regexp.MustCompile(`\[\\s\\S\]\*\[\\s\\S\]`)
+  pattern = r.ReplaceAllString(pattern, `\\\?`)
+
+  pattern = fmt.Sprintf("^%v$", pattern)
+
+  r = regexp.MustCompile(pattern)
+
+  return r.MatchString(value)
+
+}
+
+func escregexp(restr string) string {
+
+  r := regexp.MustCompile(`([-\[\]{}()*+?.,\\^$|#\s])`)
+
+  return r.ReplaceAllString(restr, "\\$1")
+
 }

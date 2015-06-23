@@ -50,7 +50,8 @@ func main() {
   pm.Add(map[string]string{"a":"1"},"A")
   pm.Add(map[string]string{"b":"2"},"B")
 
-  // You can also use the AddString method when adding patterns, this allows you to specify a map using simple notation
+  // You can also use the AddString method when adding patterns, this allows you to
+  specify a map using simple notation
   // format is "key:value,key:value" etc
   // spaces around the : divider and , divider will be stripped out when processed
   pm.AddString("c:3","C")
