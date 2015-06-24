@@ -138,21 +138,42 @@ func (p *Patrun) findItem(pat map[string]string, exact bool) interface{} {
   var foundKeys []string
   var lastData interface{} = p.tree.data
   var lastModifier Modifiers = p.tree.modifier
+  var stars []node
+  var keyPointer = 0
 
-  for k := range keys {
-    var key = keys[k]
+  for keyPointer < len(keys) {
+    var key = keys[keyPointer]
     var val = pat[key]
+
 
     currentNode = currentNode.value[key].value[val]
 
     if currentNode.key != "" {
+      if len(lastGoodNode.value) > 0 {
+        stars = append(stars, lastGoodNode)
+      }
+
       lastGoodNode = currentNode
       foundKeys = append(foundKeys, key)
       if lastGoodNode.data != nil {
         lastData = lastGoodNode.data
       }
       lastModifier = lastGoodNode.modifier
+
+      keyPointer++
+
+    } else if lastData == nil && len(stars) > 0 {
+        currentNode = stars[len(stars) - 1]
+    
+        stars = stars[:len(stars)-1]
+        lastGoodNode = currentNode
+
+    } else {
+
+      currentNode = lastGoodNode
+      keyPointer++
     }
+
   }
 
   if exact && len(foundKeys) != len(keys) {
@@ -218,6 +239,8 @@ func (p *Patrun) Remove(pat map[string]string) {
     if okToDel {
       item.data = nil
       lastParent.value[val] = item
+
+
     }
   }
 
@@ -289,8 +312,17 @@ func (p Patrun)ToString(custom func(data interface{}) string) string {
 func formatMatch(items map[string]string) string {
   var points []string
 
-  for k, v := range items {
-    points = append(points, fmt.Sprintf("%v:%v", k, v))
+  var keys []string
+  for k := range items {
+    keys = append(keys, k)
+  }
+  sort.Strings(keys)
+
+  for k := range keys {
+    var key = keys[k]
+    var val = items[key]
+
+    points = append(points, fmt.Sprintf("%v:%v", key, val))
   }
 
   return strings.Join(points, ", ")
@@ -302,7 +334,16 @@ func descendTree(items *[]Pattern, pat map[string]string, exact bool, rootLevel 
 
   copy(localKeyMap, keyMap)
 
-  for key, val := range values {
+  var keys []string
+  for k := range values {
+    keys = append(keys, k)
+  }
+  sort.Strings(keys)
+
+  for k := range keys {
+    var key = keys[k]
+    var val = values[key]
+
       if rootLevel {
         keyMap = []string{}
       }
