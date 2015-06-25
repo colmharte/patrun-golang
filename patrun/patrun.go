@@ -5,22 +5,18 @@
 //
 //Need to pick out an object based on a subset of its properties? Say you've got:
 //
-//```Go
-//{ x: 1          } -> A
+//{ x: 1       } -> A
 //{ x: 1, y: 1 } -> B
 //{ x: 1, y: 2 } -> C
-//```
 //
 //Then patrun can give you the following results:
 //
-//```Go
 //{ x: 1 }      -> A
 //{ x: 2 }      -> no match
 //{ x: 1, y: 1 } -> B
 //{ x: 1, y: 2 } -> C
 //{ x: 2, y: 2 } -> no match
 //{ y: 1 }      -> no match
-//```
 //
 //It's basically _query-by-example_ for property sets.
 package patrun
