@@ -1,9 +1,13 @@
 package patrun
 
-import "github.com/colmharte/patrun-golang/patrun"
-import "testing"
-import "regexp"
-import "fmt"
+import (
+  "github.com/colmharte/patrun-golang/patrun"
+  "testing"
+  "regexp"
+  "fmt"
+  "strings"
+  "sort"
+)
 
 func TestEmpty(t *testing.T) {
 
@@ -410,7 +414,7 @@ func TestListTopVals(t *testing.T) {
     t.Error("List p1:v1 should be [{map[p1:v1] r0}]", pat);
   }
 
-  pat = fmt.Sprintf("%v", r.ListString("p1:v1,p2:*", true))
+  pat = convertListToString(r.ListString("p1:v1,p2:*", true))
   if pat != "[{map[p1:v1 p2:v2a] r1} {map[p1:v1 p2:v2b] r1}]" {
     t.Error("List p1:v1 should be [{map[p1:v1 p2:v2a] r1} {map[p1:v1 p2:v2b] r1}]", pat);
   }
@@ -418,7 +422,7 @@ func TestListTopVals(t *testing.T) {
   r.AddString("p1:v1,p2:v2c,p3:v3a", "r3a")
   r.AddString("p1:v1,p2:v2d,p3:v3b", "r3b")
 
-  pat = fmt.Sprintf("%v", r.ListString("p1:v1,p2:*,p3:v3a", true))
+  pat = convertListToString(r.ListString("p1:v1,p2:*,p3:v3a", true))
   if pat != "[{map[p1:v1 p2:v2c p3:v3a] r3a}]" {
     t.Error("List p1:v1 should be [{map[p1:v1 p2:v2c p3:v3a] r3a}]", pat);
   }
@@ -439,7 +443,7 @@ func TestListSubVals(t *testing.T) {
     t.Error("List p1:v1 should be [{map[p1:v1] r0}]", pat);
   }
 
-  pat = fmt.Sprintf("%v", r.ListString("p1:v1,p2:*", true))
+  pat = convertListToString(r.ListString("p1:v1,p2:*", true))
   if pat != "[{map[p1:v1 p2:v2a] r1} {map[p1:v1 p2:v2b] r1}]" {
     t.Error("List p1:v1 should be [{map[p1:v1 p2:v2a] r1} {map[p1:v1 p2:v2b] r1}]", pat);
   }
@@ -447,12 +451,387 @@ func TestListSubVals(t *testing.T) {
   r.AddString("p1:v1,p2:v2c,p3:v3a", "r3a")
   r.AddString("p1:v1,p2:v2d,p3:v3b", "r3b")
 
-  pat = fmt.Sprintf("%v", r.ListString("p1:v1,p2:*,p3:v3a", true))
+  pat = convertListToString(r.ListString("p1:v1,p2:*,p3:v3a", true))
   if pat != "[{map[p1:v1 p2:v2c p3:v3a] r3a}]" {
     t.Error("List p1:v1 should be [{map[p1:v1 p2:v2c p3:v3a] r3a}]", pat);
   }
 
 }
+
+type customHappy struct{}
+
+func (a customHappy) Add(pm *patrun.Patrun, pat map[string]string, data interface{}) patrun.Modifiers {
+	pat["q"] = "9"
+
+  return nil
+}
+func TestCustomHappy(t *testing.T) {
+  r := patrun.Patrun{Custom: new(customHappy)}
+
+  r.AddString("a:1", "Q")
+
+  if r.FindString("a:1") != nil {
+    t.Error("a:1 Find should be nil", r.FindString("a:1"));
+  }
+
+  if r.FindString("a:1,q:9").(string) != "Q" {
+    t.Error("a:1,q:9 Find should be Q", r.FindString("a:1,q:9"));
+  }
+
+}
+
+type customMany struct{}
+type customModifierMany struct {
+	items []string
+}
+func (a *customMany) Add(pm *patrun.Patrun, pat map[string]string, data interface{}) patrun.Modifiers {
+	var items []string
+
+	i := pm.FindExact(pat)
+	if i == nil {
+		items = []string{}
+	} else {
+		items = i.([]string)
+	}
+	items = append(items, data.(string))
+
+	mod := new(customModifierMany)
+	mod.items = items
+
+	return mod
+
+}
+func (a *customModifierMany) Find(pm *patrun.Patrun, pat map[string]string, data interface{}) interface{} {
+
+
+	if 0 < len(a.items) {
+		return a.items
+	} else {
+		return nil
+	}
+
+}
+func (a *customModifierMany) Remove(pm *patrun.Patrun, pat map[string]string, data interface{}) bool {
+
+	if len(a.items) > 0 {
+		a.items = a.items[:len(a.items)-1]
+	}
+
+	return 0 == len(a.items)
+}
+
+
+func TestCustomMany(t *testing.T) {
+  r := patrun.Patrun{Custom: new(customMany)}
+
+  r.AddString("a:1", "A")
+  r.AddString("a:1", "B")
+  r.AddString("b:1", "C")
+
+  if fmt.Sprintf("%v",r.FindString("a:1").([]string)) != "[A B]" {
+    t.Error("a:1 Find should be [A B]", r.FindString("a:1"));
+  }
+  if fmt.Sprintf("%v", r.FindString("b:1").([]string)) != "[C]" {
+    t.Error("b:1 Find should be [C]", r.FindString("b:1"));
+  }
+
+  if len(r.List(nil, false)) != 2 {
+    t.Error("List should have length of 2", len(r.List(nil, false)));
+  }
+
+  r.RemoveString("b:1")
+  if len(r.List(nil, false)) != 1 {
+    t.Error("List should have length of 1", len(r.List(nil, false)));
+  }
+  if r.FindString("b:1")!= nil {
+    t.Error("b:1 Find should be nil", r.FindString("b:1"));
+  }
+  if fmt.Sprintf("%v",r.FindString("a:1").([]string)) != "[A B]" {
+    t.Error("a:1 Find should be [A B]", r.FindString("a:1"));
+  }
+
+  r.RemoveString("a:1")
+  if len(r.List(nil, false)) != 1 {
+    t.Error("List should have length of 1", len(r.List(nil, false)));
+  }
+  if r.FindString("b:1")!= nil {
+    t.Error("b:1 Find should be nil", r.FindString("b:1"));
+  }
+  if fmt.Sprintf("%v",r.FindString("a:1").([]string)) != "[A]" {
+    t.Error("a:1 Find should be [A]", r.FindString("a:1"));
+  }
+
+  r.RemoveString("a:1")
+  if len(r.List(nil, false)) != 0 {
+    t.Error("List should have length of 0", len(r.List(nil, false)));
+  }
+  if r.FindString("b:1")!= nil {
+    t.Error("b:1 Find should be nil", r.FindString("b:1"));
+  }
+  if r.FindString("a:1")!= nil {
+    t.Error("a:1 Find should be nil", r.FindString("a:1"));
+  }
+
+
+}
+
+
+func TestFindExact(t *testing.T) {
+  r := patrun.Patrun{}
+
+  r.AddString("a:1", "A")
+  r.AddString("a:1,b:2", "B")
+  r.AddString("a:1,b:2,c:3", "C")
+
+  if r.FindString("a:1").(string) != "A" {
+    t.Error("a:1 Find should be A", r.FindString("a:1"));
+  }
+  if r.FindExactString("a:1").(string) != "A" {
+    t.Error("a:1 Find should be A", r.FindString("a:1"));
+  }
+  if r.FindString("a:1,b:8").(string) != "A" {
+    t.Error("a:1,b:8 Find should be A", r.FindString("a:1,b:8"));
+  }
+  if r.FindExactString("a:1,b:8") != nil {
+    t.Error("a:1,b:8 Find should be nil", r.FindString("a:1,b:8"));
+  }
+  if r.FindString("a:1,b:8,c:3").(string) != "A" {
+    t.Error("a:1,b:8c:3 Find should be A", r.FindString("a:1,b:8,c:3"));
+  }
+  if r.FindExactString("a:1,b:8,c:3") != nil {
+    t.Error("a:1,b:8,c:3 Find should be nil", r.FindString("a:1,b:8,c:3"));
+  }
+
+  if r.FindString("a:1,b:2").(string) != "B" {
+    t.Error("a:1,b:2 Find should be B", r.FindString("a:1,b:2"));
+  }
+  if r.FindExactString("a:1,b:2").(string) != "B" {
+    t.Error("a:1,b:2 Find should be B", r.FindString("a:1,b:2"));
+  }
+  if r.FindString("a:1,b:2,c:9").(string) != "B" {
+    t.Error("a:1,b:2c:9 Find should be B", r.FindString("a:1,b:2,c:9"));
+  }
+  if r.FindExactString("a:1,b:2,c:9") != nil {
+    t.Error("a:1,b:2,c:9 Find should be nil", r.FindString("a:1,b:2,c:9"));
+  }
+
+  if r.FindString("a:1,b:2,c:3").(string) != "C" {
+    t.Error("a:1,b:2,c:3 Find should be C", r.FindString("a:1,b:2,c:3"));
+  }
+  if r.FindExactString("a:1,b:2,c:3").(string) != "C" {
+    t.Error("a:1,b:2,c:3 Find should be C", r.FindString("a:1,b:2,c:3"));
+  }
+  if r.FindString("a:1,b:2,c:3,d:7").(string) != "C" {
+    t.Error("a:1,b:2,c:3,d:7 Find should be C", r.FindString("a:1,b:2,c:3,d:7"));
+  }
+  if r.FindExactString("a:1,b:2,c:3,d:7") != nil {
+    t.Error("a:1,b:2,c:3,d:7 Find should be nil", r.FindString("a:1,b:2,c:3,d:7"));
+  }
+
+}
+
+type customTop struct{}
+type customModifierTop struct {}
+
+func (a *customTop) Add(pm *patrun.Patrun, pat map[string]string, data interface{}) patrun.Modifiers {
+	return new(customModifierTop)
+}
+func (a *customModifierTop) Find(pm *patrun.Patrun, pat map[string]string, data interface{}) interface{} {
+
+  return fmt.Sprintf("%v!", data)
+}
+func (a *customModifierTop) Remove(pm *patrun.Patrun, pat map[string]string, data interface{}) bool {
+  return true
+}
+
+func TestCustomTop(t *testing.T) {
+  r := patrun.Patrun{Custom: new(customTop)}
+
+  r.AddString("", "Q")
+  r.AddString("a:1", "A")
+  r.AddString("a:1,b:2", "B")
+  r.AddString("a:1,b:2,c:3", "C")
+
+  if r.FindString("").(string) != "Q!" {
+    t.Error("{} Find should be Q!", r.FindString(""));
+  }
+  if r.FindString("a:1").(string) != "A!" {
+    t.Error("a:1 Find should be A!", r.FindString("a:1"));
+  }
+  if r.FindString("a:1,b:2").(string) != "B!" {
+    t.Error("a:1,b:2 Find should be B!", r.FindString("a:1,b:2"));
+  }
+  if r.FindString("a:1,b:2,c:3").(string) != "C!" {
+    t.Error("a:1,b:2,c:3 Find should be C!", r.FindString("a:1,b:2,c:3"));
+  }
+
+}
+
+func TestListAny(t *testing.T) {
+  r := patrun.Patrun{}
+
+  r.AddString("a:1", "A")
+  r.AddString("a:1,b:2", "B")
+  r.AddString("a:1,b:2,c:3", "C")
+
+
+  var mA = "{map[a:1] A}"
+  var mB = "{map[a:1 b:2] B}"
+  var mC = "{map[a:1 b:2 c:3] C}"
+
+  if convertListToString(r.List(nil, false)) != fmt.Sprintf("[%v %v %v]", mA, mB, mC) {
+    t.Error("List should be ", fmt.Sprintf("[%v %v %v]", mA, mB, mC) , convertListToString(r.List(nil, false)));
+  }
+
+  if convertListToString(r.ListString("a:1", false)) != fmt.Sprintf("[%v %v %v]", mA, mB, mC) {
+    t.Error("a:1 List should be ", fmt.Sprintf("[%v %v %v]", mA, mB, mC) , convertListToString(r.ListString("a:1", false)));
+  }
+  if convertListToString(r.ListString("b:2", false)) != fmt.Sprintf("[%v %v]", mB, mC) {
+    t.Error("b:2 List should be ", fmt.Sprintf("[%v %v]", mB, mC) , convertListToString(r.ListString("b:2", false)));
+  }
+  if convertListToString(r.ListString("c:3", false)) != fmt.Sprintf("[%v]", mC) {
+    t.Error("c:3 List should be ", fmt.Sprintf("[%v]", mC) , convertListToString(r.ListString("c:3", false)));
+  }
+
+  if convertListToString(r.ListString("a:*", false)) != fmt.Sprintf("[%v %v %v]", mA, mB, mC) {
+    t.Error("a:* List should be ", fmt.Sprintf("[%v %v %v]", mA, mB, mC) , convertListToString(r.ListString("a:*", false)));
+  }
+  if convertListToString(r.ListString("b:*", false)) != fmt.Sprintf("[%v %v]", mB, mC) {
+    t.Error("b:* List should be ", fmt.Sprintf("[%v %v]", mB, mC) , convertListToString(r.ListString("b:*", false)));
+  }
+  if convertListToString(r.ListString("c:*", false)) != fmt.Sprintf("[%v]", mC) {
+    t.Error("c:* List should be ", fmt.Sprintf("[%v]", mC) , convertListToString(r.ListString("c:*", false)));
+  }
+
+  if convertListToString(r.ListString("a:1,b:2", false)) != fmt.Sprintf("[%v %v]", mB, mC) {
+    t.Error("a:1,b:2 List should be ", fmt.Sprintf("[%v %v]", mB, mC) , convertListToString(r.ListString("a:1,b:2", false)));
+  }
+  if convertListToString(r.ListString("a:1,b:*", false)) != fmt.Sprintf("[%v %v]", mB, mC) {
+    t.Error("a:1,b:* List should be ", fmt.Sprintf("[%v %v]", mB, mC) , convertListToString(r.ListString("a:1, b:*", false)));
+  }
+  if convertListToString(r.ListString("a:1,b:*,c:3", false)) != fmt.Sprintf("[%v]", mC) {
+    t.Error("a:1,b*,c:3 List should be ", fmt.Sprintf("[%v]", mC) , convertListToString(r.ListString("a:1,b:*,c:3", false)));
+  }
+  if convertListToString(r.ListString("a:1,b:*,c:*", false)) != fmt.Sprintf("[%v]", mC) {
+    t.Error("a:1,b*,c:* List should be ", fmt.Sprintf("[%v]", mC) , convertListToString(r.ListString("a:1,b:*,c:*", false)));
+  }
+  if convertListToString(r.ListString("a:1,c:*", false)) != fmt.Sprintf("[%v]", mC) {
+    t.Error("a:1,c:* List should be ", fmt.Sprintf("[%v]", mC) , convertListToString(r.ListString("a:1,c:*", false)));
+  }
+
+  r.AddString("a:1,d:4", "D")
+  var mD = "{map[a:1 d:4] D}"
+
+  if convertListToString(r.ListString("", false)) != fmt.Sprintf("[%v %v %v %v]", mA, mB, mC, mD) {
+    t.Error("List all should be ", fmt.Sprintf("[%v %v %v %v]", mA,mB, mC, mD) , convertListToString(r.ListString("", false)));
+  }
+  if convertListToString(r.ListString("a:1", false)) != fmt.Sprintf("[%v %v %v %v]", mA, mB, mC, mD) {
+    t.Error("a:1 List should be ", fmt.Sprintf("[%v %v %v %v]", mA,mB, mC, mD) , convertListToString(r.ListString("a:1", false)));
+  }
+  if convertListToString(r.ListString("d:4", false)) != fmt.Sprintf("[%v]",  mD) {
+    t.Error("d:4 List should be ", fmt.Sprintf("[%v]",  mD) , convertListToString(r.ListString("d:4", false)));
+  }
+  if convertListToString(r.ListString("a:1,d:4", false)) != fmt.Sprintf("[%v]",  mD) {
+    t.Error("a:1,d:4 List should be ", fmt.Sprintf("[%v]",  mD) , convertListToString(r.ListString("a:1,d:4", false)));
+  }
+  if convertListToString(r.ListString("a:1,d:*", false)) != fmt.Sprintf("[%v]",  mD) {
+    t.Error("a:1,d:* List should be ", fmt.Sprintf("[%v]",  mD) , convertListToString(r.ListString("a:1,d:*", false)));
+  }
+  if convertListToString(r.ListString("d:*", false)) != fmt.Sprintf("[%v]",  mD) {
+    t.Error("d:* List should be ", fmt.Sprintf("[%v]",  mD) , convertListToString(r.ListString("d:*", false)));
+  }
+
+  r.AddString("a:1,c:33", "CC")
+  var mCC = "{map[a:1 c:33] CC}"
+
+  if convertListToString(r.ListString("", false)) != fmt.Sprintf("[%v %v %v %v %v]", mA, mB, mC, mCC, mD) {
+    t.Error("List all should be ", fmt.Sprintf("[%v %v %v %v %v]", mA,mB, mC, mCC, mD) , convertListToString(r.ListString("", false)));
+  }
+  if convertListToString(r.ListString("a:1", false)) != fmt.Sprintf("[%v %v %v %v %v]", mA, mB, mC, mCC, mD) {
+    t.Error("a:1 List should be ", fmt.Sprintf("[%v %v %v %v %v]", mA,mB, mC, mCC, mD) , convertListToString(r.ListString("a:1", false)));
+  }
+  if convertListToString(r.ListString("d:4", false)) != fmt.Sprintf("[%v]",  mD) {
+    t.Error("d:4 List should be ", fmt.Sprintf("[%v]",  mD) , convertListToString(r.ListString("d:4", false)));
+  }
+  if convertListToString(r.ListString("a:1,d:4", false)) != fmt.Sprintf("[%v]",  mD) {
+    t.Error("a:1,d:4 List should be ", fmt.Sprintf("[%v]",  mD) , convertListToString(r.ListString("a:1,d:4", false)));
+  }
+  if convertListToString(r.ListString("a:1,d:*", false)) != fmt.Sprintf("[%v]",  mD) {
+    t.Error("a:1,d:* List should be ", fmt.Sprintf("[%v]",  mD) , convertListToString(r.ListString("a:1,d:*", false)));
+  }
+  if convertListToString(r.ListString("d:*", false)) != fmt.Sprintf("[%v]",  mD) {
+    t.Error("d:* List should be ", fmt.Sprintf("[%v]",  mD) , convertListToString(r.ListString("d:*", false)));
+  }
+  if convertListToString(r.ListString("c:33", false)) != fmt.Sprintf("[%v]",  mCC) {
+    t.Error("c:33 List should be ", fmt.Sprintf("[%v]",  mCC) , convertListToString(r.ListString("c:33", false)));
+  }
+  if convertListToString(r.ListString("a:1,c:33", false)) != fmt.Sprintf("[%v]",  mCC) {
+    t.Error("a:1,c:33 List should be ", fmt.Sprintf("[%v]",  mCC) , convertListToString(r.ListString("a:1,c:33", false)));
+  }
+  if convertListToString(r.ListString("a:1,c:*", false)) != fmt.Sprintf("[%v %v]",  mC, mCC) {
+    t.Error("a:1,c:* List should be ", fmt.Sprintf("[%v %v]",  mC, mCC) , convertListToString(r.ListString("a:1,c:*", false)));
+  }
+  if convertListToString(r.ListString("c:*", false)) != fmt.Sprintf("[%v %v]", mC, mCC) {
+    t.Error("c:* List should be ", fmt.Sprintf("[%v %v]", mC, mCC) , convertListToString(r.ListString("c:*", false)));
+  }
+
+  if convertListToString(r.ListString("a:1", true)) != fmt.Sprintf("[%v]", mA) {
+    t.Error("a:1 List Exact should be ", fmt.Sprintf("[%v]", mA) , convertListToString(r.ListString("a:1", true)));
+  }
+  if convertListToString(r.ListString("a:*", true)) != fmt.Sprintf("[%v]", mA) {
+    t.Error("a:* List Exact should be ", fmt.Sprintf("[%v]", mA) , convertListToString(r.ListString("a:*", true)));
+  }
+  if convertListToString(r.ListString("a:1,b:2", true)) != fmt.Sprintf("[%v]", mB) {
+    t.Error("a:1,b:2 List Exact should be ", fmt.Sprintf("[%v]", mB) , convertListToString(r.ListString("a:1,b:2", true)));
+  }
+  if convertListToString(r.ListString("a:1,b:*", true)) != fmt.Sprintf("[%v]", mB) {
+    t.Error("a:1,b:* List Exact should be ", fmt.Sprintf("[%v]", mB) , convertListToString(r.ListString("a:1,b:*", true)));
+  }
+  if convertListToString(r.ListString("a:1,c:3", true)) != "[]" {
+    t.Error("a:1,c:3 List Exact should be []", convertListToString(r.ListString("a:1,c:3", true)));
+  }
+  if convertListToString(r.ListString("a:1,c:33", true)) != fmt.Sprintf("[%v]", mCC) {
+    t.Error("a:1,c:33 List Exact should be ", fmt.Sprintf("[%v]", mCC) , convertListToString(r.ListString("a:1,c:33", true)));
+  }
+  if convertListToString(r.ListString("a:1,c:*", true)) != fmt.Sprintf("[%v]", mCC) {
+    t.Error("a:1,c:* List Exact should be ", fmt.Sprintf("[%v]", mCC) , convertListToString(r.ListString("a:1,c:*", true)));
+  }
+
+}
+
+
+
+
+
+func convertListToString(items []patrun.Pattern) string {
+  var data []string
+
+  for k := range items {
+    v := items[k]
+    data = append(data, fmt.Sprintf("{map[%v] %v}", formatMatch(v.Match), fmt.Sprintf("%v", v.Data)))
+  }
+
+  return fmt.Sprintf("[%v]", strings.Join(data, " "))
+}
+func formatMatch(items map[string]string) string {
+  var points []string
+
+  var keys []string
+  for k := range items {
+    keys = append(keys, k)
+  }
+  sort.Strings(keys)
+
+  for k := range keys {
+    var key = keys[k]
+    var val = items[key]
+
+    points = append(points, fmt.Sprintf("%v:%v", key, val))
+  }
+
+  return strings.Join(points, " ")
+}
+
 
 func rs(x patrun.Patrun) string {
   value := x.String()

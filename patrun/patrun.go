@@ -101,6 +101,7 @@ func (p *Patrun) Add(pat map[string]string, data interface{}) *Patrun {
 
     if len(keys) == 0 {
       p.tree.data = data
+      p.tree.modifier = custom
     }
 
     return p
@@ -164,7 +165,7 @@ func (p *Patrun) findItem(pat map[string]string, exact bool) interface{} {
 
     } else if lastData == nil && len(stars) > 0 {
         currentNode = stars[len(stars) - 1]
-    
+
         stars = stars[:len(stars)-1]
         lastGoodNode = currentNode
 
@@ -266,6 +267,7 @@ func (p *Patrun)List(pat map[string]string, exact bool) []Pattern {
   }
 
   if p.tree.key != "" {
+
     descendTree(&items, pat, exact, true, p.tree.value, keyMap)
   }
   return items
@@ -328,6 +330,7 @@ func formatMatch(items map[string]string) string {
   return strings.Join(points, ", ")
 }
 
+
 func descendTree(items *[]Pattern, pat map[string]string, exact bool, rootLevel bool, values map[string]node, keyMap []string) {
 
   var localKeyMap []string
@@ -355,7 +358,7 @@ func descendTree(items *[]Pattern, pat map[string]string, exact bool, rootLevel 
 
       } else if val.data != nil {
         localKeyMap = append(keyMap, val.key)
-        if validatePatterMatch(pat, exact, localKeyMap) {
+        if validatePatternMatch(pat, exact, localKeyMap) {
           *items = append(*items, createMatchList(localKeyMap, val.data))
         }
 
@@ -366,7 +369,7 @@ func descendTree(items *[]Pattern, pat map[string]string, exact bool, rootLevel 
   }
 }
 
-func validatePatterMatch(pat map[string]string, exact bool, matchedKeys []string) bool {
+func validatePatternMatch(pat map[string]string, exact bool, matchedKeys []string) bool {
   var keys []string
   for k := range pat {
     keys = append(keys, k)
@@ -378,8 +381,21 @@ func validatePatterMatch(pat map[string]string, exact bool, matchedKeys []string
     return true
   }
 
+  pathMap := convertListToMap(matchedKeys)
+
+  var matched = true
+  for k, v := range pat {
+
+    if pathMap[k] == "" || !gexval(v, pathMap[k]) {
+      matched = false
+      break
+    }
+  }
+
+  /*
   var foundKeys []string
   var key, val string
+  var startKey = keys[0]
 
   for k := range keys {
     key = keys[k]
@@ -392,10 +408,7 @@ func validatePatterMatch(pat map[string]string, exact bool, matchedKeys []string
 
   var matched = true
   for i := 0; i < len(foundKeys); i++ {
-    //regex here
-
-
-    if i >= len(matchedKeys) {
+    if i >= len(matchedKeys)  {
       matched = false
     }
     if matched && i % 2 == 0 && foundKeys[i] != matchedKeys[i] {
@@ -411,11 +424,27 @@ func validatePatterMatch(pat map[string]string, exact bool, matchedKeys []string
     }
   }
 
-  if exact && len(foundKeys) != len(matchedKeys) {
+  if exact && len(foundKeys) != len(matchedKeys)  {
+    matched = false
+  }
+*/
+
+  if exact && len(pat) != len(pathMap) {
     matched = false
   }
 
   return matched
+}
+
+
+func convertListToMap(listItems []string) map[string]string {
+  var mapData = map[string]string{}
+
+  for k := 0; k < len(listItems); k+=2 {
+    mapData[listItems[k]] = listItems[k+1]
+  }
+
+  return mapData
 }
 
 func createMatchList(keyMap []string, dataItem interface{}) Pattern {
