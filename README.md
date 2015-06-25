@@ -29,7 +29,7 @@ It's basically _query-by-example_ for property sets.
 If you're using this library, feel free to contact me on twitter if you have any questions! :) [@colmharte](http://twitter.com/colmharte)
 
 
-Current Version: 0.1.0
+Current Version: 0.1.1
 
 Tested on: Go v1.4.2
 
