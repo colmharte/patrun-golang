@@ -41,6 +41,7 @@ type node struct {
 type Pattern struct {
     Match map[string]string
     Data interface{}
+    Modifier Modifiers
 }
 
 //Modifiers allow you to customise the results for the Find and Remove methods
@@ -74,11 +75,7 @@ func (p *Patrun) Add(pat map[string]string, data interface{}) *Patrun {
       p.tree = node{"root", map[string]node{}, nil, nil}
     }
 
-    var keys []string
-    for k := range pat {
-      keys = append(keys, k)
-    }
-    sort.Strings(keys)
+    var keys = sortKeys(pat)
 
 
     var currentNode node = p.tree
@@ -163,11 +160,7 @@ func (p *Patrun) FindExactString(pat string) interface{} {
 }
 
 func (p *Patrun) findItem(pat map[string]string, exact bool) interface{} {
-  var keys []string
-  for k := range pat {
-    keys = append(keys, k)
-  }
-  sort.Strings(keys)
+  var keys = sortKeys(pat)
 
   var currentNode = p.tree
   var lastGoodNode = currentNode
@@ -228,11 +221,7 @@ func (p *Patrun) findItem(pat map[string]string, exact bool) interface{} {
 
 //Remove this pattern, and it's object, from the matcher.
 func (p *Patrun) Remove(pat map[string]string) {
-  var keys []string
-  for k := range pat {
-    keys = append(keys, k)
-  }
-  sort.Strings(keys)
+  var keys = sortKeys(pat)
 
   var currentNode = p.tree
   var lastGoodNode = currentNode
@@ -261,7 +250,15 @@ func (p *Patrun) Remove(pat map[string]string) {
 
   //found a match so delete the data element
   if len(foundKeys) == len(keys) {
-    var item = lastParent.value[val]
+    var item node
+
+    if len(pat) == 0 {
+      fmt.Println("afsdf")
+      item = p.tree
+    } else {
+      item = lastParent.value[val]
+    }
+
     var okToDel = true
 
     if lastGoodNode.modifier != nil {
@@ -269,9 +266,12 @@ func (p *Patrun) Remove(pat map[string]string) {
     }
     if okToDel {
       item.data = nil
-      lastParent.value[val] = item
-
-
+      item.modifier = nil
+      if len(pat) == 0 {
+        p.tree = node{p.tree.key, p.tree.value, nil, nil}
+      } else {
+        lastParent.value[val] = item
+      }
     }
   }
 
@@ -299,7 +299,7 @@ func (p *Patrun)List(pat map[string]string, exact bool) []Pattern {
   }
 
   if p.tree.data != nil {
-    items = append(items, createMatchList(keyMap, p.tree.data))
+    items = append(items, createMatchList(keyMap, p.tree.data, p.tree.modifier))
   }
 
   if p.tree.key != "" {
@@ -358,11 +358,7 @@ func (p Patrun)ToString(custom func(data interface{}) string) string {
 func formatMatch(items map[string]string) string {
   var points []string
 
-  var keys []string
-  for k := range items {
-    keys = append(keys, k)
-  }
-  sort.Strings(keys)
+  var keys  = sortKeys(items)
 
   for k := range keys {
     var key = keys[k]
@@ -380,6 +376,7 @@ func descendTree(items *[]Pattern, pat map[string]string, exact bool, rootLevel 
   var localKeyMap []string
 
   copy(localKeyMap, keyMap)
+
 
   var keys []string
   for k := range values {
@@ -401,7 +398,7 @@ func descendTree(items *[]Pattern, pat map[string]string, exact bool, rootLevel 
       } else if val.data != nil {
         localKeyMap = append(keyMap, val.key)
         if validatePatternMatch(pat, exact, localKeyMap) {
-          *items = append(*items, createMatchList(localKeyMap, val.data))
+          *items = append(*items, createMatchList(localKeyMap, val.data, val.modifier))
         }
 
         if len(val.value) > 0 {
@@ -412,12 +409,7 @@ func descendTree(items *[]Pattern, pat map[string]string, exact bool, rootLevel 
 }
 
 func validatePatternMatch(pat map[string]string, exact bool, matchedKeys []string) bool {
-  var keys []string
-  for k := range pat {
-    keys = append(keys, k)
-  }
-  sort.Strings(keys)
-
+  var keys = sortKeys(pat)
 
   if len(keys) == 0 {
     return true
@@ -452,7 +444,7 @@ func convertListToMap(listItems []string) map[string]string {
   return mapData
 }
 
-func createMatchList(keyMap []string, dataItem interface{}) Pattern {
+func createMatchList(keyMap []string, dataItem interface{}, modifier Modifiers) Pattern {
 
   var keys map[string]string = map[string]string{}
   var item Pattern = Pattern{}
@@ -465,6 +457,7 @@ func createMatchList(keyMap []string, dataItem interface{}) Pattern {
 
   item.Match = keys
   item.Data = dataItem
+  item.Modifier = modifier
 
   return item
 }
@@ -534,4 +527,14 @@ func escregexp(restr string) string {
 
   return r.ReplaceAllString(restr, "\\$1")
 
+}
+
+func sortKeys(pat map[string]string) []string {
+  var keys []string
+  for k := range pat {
+    keys = append(keys, k)
+  }
+  sort.Strings(keys)
+
+  return keys
 }

@@ -58,8 +58,8 @@ func TestRoot(t *testing.T) {
       t.Error("pattern should be <R>", rs(r));
     }
 
-    if string(r.ToJSON()[:]) != "[{\"Match\":{},\"Data\":\"R\"}]" {
-      t.Error("JSON pattern should be [{\"Match\":{},\"Data\":\"R\"}]", string(r.ToJSON()[:]));
+    if string(r.ToJSON()[:]) != "[{\"Match\":{},\"Data\":\"R\",\"Modifier\":null}]" {
+      t.Error("JSON pattern should be [{\"Match\":{},\"Data\":\"R\",\"Modifier\":null}]", string(r.ToJSON()[:]));
     }
 
     if r.Find(map[string]string{}) != "R" {
@@ -83,8 +83,8 @@ func TestRoot(t *testing.T) {
       t.Error("pattern should be <R>a:1<r1>", rs(r));
     }
 
-    if string(r.ToJSON()[:]) != "[{\"Match\":{},\"Data\":\"R\"},{\"Match\":{\"a\":\"1\"},\"Data\":\"r1\"}]" {
-      t.Error("JSON pattern should be [{\"Match\":{},\"Data\":\"R\"},{\"Match\":{\"a\":\"1\"},\"Data\":\"r1\"}]", string(r.ToJSON()[:]));
+    if string(r.ToJSON()[:]) != "[{\"Match\":{},\"Data\":\"R\",\"Modifier\":null},{\"Match\":{\"a\":\"1\"},\"Data\":\"r1\",\"Modifier\":null}]" {
+      t.Error("JSON pattern should be [{\"Match\":{},\"Data\":\"R\",\"Modifier\":null},{\"Match\":{\"a\":\"1\"},\"Data\":\"r1\",\"Modifier\":null}]", string(r.ToJSON()[:]));
     }
 
 }
@@ -104,8 +104,8 @@ func TestAdd(t *testing.T) {
     t.Error("pattern should be a:1<r1>", pat);
   }
 
-  if string(r.ToJSON()[:]) != "[{\"Match\":{\"a\":\"1\"},\"Data\":\"r1\"}]" {
-    t.Error("JSON pattern should be [{\"Match\":{\"a\":\"1\"},\"Data\":\"r1\"}]", string(r.ToJSON()[:]));
+  if string(r.ToJSON()[:]) != "[{\"Match\":{\"a\":\"1\"},\"Data\":\"r1\",\"Modifier\":null}]" {
+    t.Error("JSON pattern should be [{\"Match\":{\"a\":\"1\"},\"Data\":\"r1\",\"Modifier\":null}]", string(r.ToJSON()[:]));
   }
 
   r = patrun.Patrun{}
@@ -150,8 +150,8 @@ func TestAdd(t *testing.T) {
   if pat != "a:1,b:3<r2>a:1,c:2<r1>" {
     t.Error("pattern should be a:1,b:3<r2>a:1,c:2<r1>", pat);
   }
-  if string(r.ToJSON()[:]) != "[{\"Match\":{\"a\":\"1\",\"b\":\"3\"},\"Data\":\"r2\"},{\"Match\":{\"a\":\"1\",\"c\":\"2\"},\"Data\":\"r1\"}]" {
-    t.Error("JSON pattern should be [{\"Match\":{\"a\":\"1\",\"b\":\"3\"},\"Data\":\"r2\"},{\"Match\":{\"a\":\"1\",\"c\":\"2\"},\"Data\":\"r1\"}]", string(r.ToJSON()[:]));
+  if string(r.ToJSON()[:]) != "[{\"Match\":{\"a\":\"1\",\"b\":\"3\"},\"Data\":\"r2\",\"Modifier\":null},{\"Match\":{\"a\":\"1\",\"c\":\"2\"},\"Data\":\"r1\",\"Modifier\":null}]" {
+    t.Error("JSON pattern should be [{\"Match\":{\"a\":\"1\",\"b\":\"3\"},\"Data\":\"r2\",\"Modifier\":null},{\"Match\":{\"a\":\"1\",\"c\":\"2\"},\"Data\":\"r1\",\"Modifier\":null}]", string(r.ToJSON()[:]));
   }
 }
 
@@ -227,10 +227,20 @@ func TestRemove(t *testing.T) {
   r := patrun.Patrun{}
   r.RemoveString("p1:v1")
 
+  r.AddString("", "s0")
+  if r.FindString("").(string) != "s0" {
+    t.Error("empty Find should be s0", r.FindString(""));
+  }
+  r.RemoveString("")
+  if r.FindString("") != nil {
+    t.Error("empty Find should be nil", r.FindString(""));
+  }
+
   r.AddString("p1:v1", "r0" )
   if r.Find(map[string]string{"p1":"v1"}).(string) != "r0" {
     t.Error("p1:v1 Find should be r0", r.Find(map[string]string{"p1":"v1"}));
   }
+
 
   r.RemoveString("p1:v1")
   if r.FindString("p1:v1") != nil {
@@ -315,8 +325,8 @@ func TestAll(t *testing.T) {
   r.AddString("a:1", "X" )
   r.AddString("b:2", "Y" )
 
-  if fmt.Sprintf("%v", r.List(nil, false)) != "[{map[a:1] X} {map[b:2] Y}]" {
-    t.Error("List all should be [{map[a:1] X} {map[b:2] Y}]", fmt.Sprintf("%v", r.List(nil, false)))
+  if fmt.Sprintf("%v", r.List(nil, false)) != "[{map[a:1] X <nil>} {map[b:2] Y <nil>}]" {
+    t.Error("List all should be [{map[a:1] X <nil>} {map[b:2] Y <nil>}]", fmt.Sprintf("%v", r.List(nil, false)))
   }
 
 }
@@ -410,8 +420,8 @@ func TestListTopVals(t *testing.T) {
   r.AddString("p1:v1,p2:v2b", "r1")
 
   var pat = fmt.Sprintf("%v", r.ListString("p1:v1", true))
-  if pat != "[{map[p1:v1] r0}]" {
-    t.Error("List p1:v1 should be [{map[p1:v1] r0}]", pat);
+  if pat != "[{map[p1:v1] r0 <nil>}]" {
+    t.Error("List p1:v1 should be [{map[p1:v1] r0 <nil>}]", pat);
   }
 
   pat = convertListToString(r.ListString("p1:v1,p2:*", true))
@@ -439,8 +449,8 @@ func TestListSubVals(t *testing.T) {
   r.AddString("p1:v1,p2:v2b", "r1")
 
   var pat = fmt.Sprintf("%v", r.ListString("p1:v1", true))
-  if pat != "[{map[p1:v1] r0}]" {
-    t.Error("List p1:v1 should be [{map[p1:v1] r0}]", pat);
+  if pat != "[{map[p1:v1] r0 <nil>}]" {
+    t.Error("List p1:v1 should be [{map[p1:v1] r0 <nil>}]", pat);
   }
 
   pat = convertListToString(r.ListString("p1:v1,p2:*", true))
@@ -800,6 +810,108 @@ func TestListAny(t *testing.T) {
 }
 
 
+type customGex struct{}
+type customModifierGex struct {
+	gexers map[string]string
+  prevfind patrun.Modifiers
+  prevdata interface{}
+}
+
+func (a *customGex) Add(pm *patrun.Patrun, pat map[string]string, data interface{}) patrun.Modifiers {
+   gexers := map[string]string{}
+  for k, v := range pat {
+    if strings.Index(v, "*") > -1 {
+      gexers[k] = v
+      delete(pat, k)
+    }
+  }
+
+  // handle previous patterns that match this pattern
+  var prev = pm.List(pat, false)
+  var prevfind patrun.Modifiers
+  var prevdata interface{}
+
+  if len(prev) > 0 {
+    prevfind = prev[0].Modifier
+
+    prevdata = pm.FindExact(prev[0].Match)
+  }
+
+  mod := new(customModifierGex)
+	mod.gexers = gexers
+  mod.prevfind = prevfind
+  mod.prevdata = prevdata
+
+	return mod
+
+}
+func (a *customModifierGex) Find(pm *patrun.Patrun, pat map[string]string, data interface{}) interface{} {
+  var out = data
+
+  for k, _ := range a.gexers {
+    val := pat[k]
+
+    if !gexval(a.gexers[k], val) {
+      out = nil
+    }
+  }
+
+  if a.prevfind != nil && out != nil {
+    out = a.prevfind.Find(pm, pat , a.prevdata)
+  }
+
+  return out
+
+}
+func (a *customModifierGex) Remove(pm *patrun.Patrun, pat map[string]string, data interface{}) bool {
+  return true
+}
+
+func aaTestCustomGex(t *testing.T) {
+
+  r := patrun.Patrun{Custom: new (customGex)}
+
+  r.AddString( "a:1,b:*", "X")
+
+  if r.FindString("a:1").(string) != "X" {
+    t.Error("a:1 Find should be X", r.FindString("a:1"));
+  }
+  if r.FindString("a:1,b:x").(string) != "X" {
+    t.Error("a:1,b:x Find should be X", r.FindString("a:1,b:x"));
+  }
+
+  r.AddString( "a:1,b:*,c:q*z", "Y")
+  if r.FindString("a:1").(string) != "X" {
+    t.Error("a:1 Find should be X", r.FindString("a:1"));
+  }
+  if r.FindString("a:1,b:x").(string) != "X" {
+    t.Error("a:1,b:x Find should be X", r.FindString("a:1,b:x"));
+  }
+  if r.FindString("a:1,b:x,c:qza").(string) != "Y" {
+    t.Error("a:1,b:x,c:qaz Find should be Y", r.FindString("a:1,b:x,c:qaz"));
+  }
+
+  r.AddString( "w:1", "W")
+  if r.FindString("w:1").(string) != "W" {
+    t.Error("w:1 Find should be W", r.FindString("w:1"));
+  }
+  if r.FindString("w:1,q:x").(string) != "W" {
+    t.Error("w:1,q:x Find should be W", r.FindString("w:1,q:x"));
+  }
+
+
+  r.AddString("w:1,q:*", "Q")
+  if r.FindString("w:1").(string) != "W" {
+    t.Error("w:1 Find should be W", r.FindString("w:1"));
+  }
+  if r.FindString("w:1,q:x").(string) != "Q" {
+    t.Error("w:1,q:x Find should be Q", r.FindString("w:1,q:x"));
+  }
+  if r.FindString("w:1,q:y").(string) != "W" {
+    t.Error("w:1,q:y Find should be Y", r.FindString("w:1,q:y"));
+  }
+
+}
 
 
 
@@ -848,4 +960,40 @@ func rs(x patrun.Patrun) string {
 
 
   return value
+}
+
+func gexval(pattern string, value string) bool {
+
+  pattern = escregexp(pattern)
+
+  // use [\s\S] instead of . to match newlines
+
+  r := regexp.MustCompile(`\\\*`)
+
+  pattern = r.ReplaceAllString(pattern, "[\\s\\S]*")
+
+  r = regexp.MustCompile(`\\\?`)
+  pattern = r.ReplaceAllString(pattern, "[\\s\\S]")
+
+  // escapes ** and *?
+  r = regexp.MustCompile(`\[\\s\\S\]\*\[\\s\\S\]\*`)
+  pattern = r.ReplaceAllString(pattern, `\\\*`)
+
+  r = regexp.MustCompile(`\[\\s\\S\]\*\[\\s\\S\]`)
+  pattern = r.ReplaceAllString(pattern, `\\\?`)
+
+  pattern = fmt.Sprintf("^%v$", pattern)
+
+  r = regexp.MustCompile(pattern)
+
+  return r.MatchString(value)
+
+}
+
+func escregexp(restr string) string {
+
+  r := regexp.MustCompile(`([-\[\]{}()*+?.,\\^$|#\s])`)
+
+  return r.ReplaceAllString(restr, "\\$1")
+
 }
