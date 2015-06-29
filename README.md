@@ -81,6 +81,11 @@ func main() {
 
 You're matching a subset, so your input can contain any number of other properties.
 
+## Install
+
+```sh
+go get github.com/colmharte/patrun-golang/patrun
+```
 
 # The Why
 
@@ -143,8 +148,7 @@ func main() {
     } else {
 
   		f := salestax.Find(map[string]string{"country":"US", "state":"NY"})
-  		fmt.Println(reflect.ValueOf(f))
-  		return 1.0//f.(func())(net)
+  		return f.(func(float64) float64)(net)
     }
   }
 
@@ -441,7 +445,7 @@ fmt.Println(pm.ListString("c:1", false))
 ```
 
 If you provide no pattern argument at all, _list_ will list all patterns that have been added.
-```Ruby
+```Go
 # finds everything
 fmt.Println(pm.List(nil, false))
 ```
