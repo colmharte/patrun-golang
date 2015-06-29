@@ -820,9 +820,11 @@ type customModifierGex struct {
 func (a *customGex) Add(pm *patrun.Patrun, pat map[string]string, data interface{}) patrun.Modifiers {
    gexers := map[string]string{}
   for k, v := range pat {
-    if strings.Index(v, "*") > -1 {
+    if ^strings.Index(v, "*") != 0 {
+
       gexers[k] = v
       delete(pat, k)
+
     }
   }
 
@@ -835,6 +837,7 @@ func (a *customGex) Add(pm *patrun.Patrun, pat map[string]string, data interface
     prevfind = prev[0].Modifier
 
     prevdata = pm.FindExact(prev[0].Match)
+
   }
 
   mod := new(customModifierGex)
@@ -856,7 +859,7 @@ func (a *customModifierGex) Find(pm *patrun.Patrun, pat map[string]string, data 
     }
   }
 
-  if a.prevfind != nil && out != nil {
+  if a.prevfind != nil && out == nil {
     out = a.prevfind.Find(pm, pat , a.prevdata)
   }
 
@@ -867,7 +870,7 @@ func (a *customModifierGex) Remove(pm *patrun.Patrun, pat map[string]string, dat
   return true
 }
 
-func aaTestCustomGex(t *testing.T) {
+func TestCustomGex(t *testing.T) {
 
   r := patrun.Patrun{Custom: new (customGex)}
 
@@ -887,7 +890,7 @@ func aaTestCustomGex(t *testing.T) {
   if r.FindString("a:1,b:x").(string) != "X" {
     t.Error("a:1,b:x Find should be X", r.FindString("a:1,b:x"));
   }
-  if r.FindString("a:1,b:x,c:qza").(string) != "Y" {
+  if r.FindString("a:1,b:x,c:qaz").(string) != "Y" {
     t.Error("a:1,b:x,c:qaz Find should be Y", r.FindString("a:1,b:x,c:qaz"));
   }
 
@@ -900,7 +903,7 @@ func aaTestCustomGex(t *testing.T) {
   }
 
 
-  r.AddString("w:1,q:*", "Q")
+  r.AddString("w:1,q:x*", "Q")
   if r.FindString("w:1").(string) != "W" {
     t.Error("w:1 Find should be W", r.FindString("w:1"));
   }

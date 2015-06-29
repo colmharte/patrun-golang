@@ -253,7 +253,6 @@ func (p *Patrun) Remove(pat map[string]string) {
     var item node
 
     if len(pat) == 0 {
-      fmt.Println("afsdf")
       item = p.tree
     } else {
       item = lastParent.value[val]
@@ -321,7 +320,6 @@ func (p *Patrun) ListString(pat string, exact bool) []Pattern {
 func (p *Patrun)ToJSON() []byte {
   b, _ := json.Marshal(p.List(nil, false))
 
-
   return b
 }
 
@@ -377,7 +375,6 @@ func descendTree(items *[]Pattern, pat map[string]string, exact bool, rootLevel 
 
   copy(localKeyMap, keyMap)
 
-
   var keys []string
   for k := range values {
     keys = append(keys, k)
@@ -388,23 +385,23 @@ func descendTree(items *[]Pattern, pat map[string]string, exact bool, rootLevel 
     var key = keys[k]
     var val = values[key]
 
-      if rootLevel {
-        keyMap = []string{}
+    if rootLevel {
+      keyMap = []string{}
+    }
+
+    if val.data == nil && len(val.value) > 0 {
+      descendTree(items, pat, exact, false, val.value, append(keyMap, key))
+
+    } else if val.data != nil {
+      localKeyMap = append(keyMap, val.key)
+      if validatePatternMatch(pat, exact, localKeyMap) {
+        *items = append(*items, createMatchList(localKeyMap, val.data, val.modifier))
       }
 
-      if val.data == nil && len(val.value) > 0 {
-        descendTree(items, pat, exact, false, val.value, append(keyMap, key))
-
-      } else if val.data != nil {
-        localKeyMap = append(keyMap, val.key)
-        if validatePatternMatch(pat, exact, localKeyMap) {
-          *items = append(*items, createMatchList(localKeyMap, val.data, val.modifier))
-        }
-
-        if len(val.value) > 0 {
-          descendTree(items, pat, exact, false, val.value, append(keyMap, val.key))
-        }
+      if len(val.value) > 0 {
+        descendTree(items, pat, exact, false, val.value, append(keyMap, val.key))
       }
+    }
   }
 }
 
